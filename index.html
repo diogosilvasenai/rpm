@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Velocímetro IoT — ESP32</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0c10;
+      --bg2:       #0f1218;
+      --panel:     #131820;
+      --border:    #1e2530;
+      --cyan:      #00d4ff;
+      --cyan-dim:  #005f73;
+      --green:     #00ff88;
+      --green-dim: #00512c;
+      --amber:     #ffb300;
+      --red:       #ff3d3d;
+      --text:      #c8d8e8;
+      --muted:     #4a5568;
+      --font-ui:   'Rajdhani', sans-serif;
+      --font-mono: 'Share Tech Mono', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px 48px;
+      overflow-x: hidden;
+    }
+
+    /* Grid de fundo */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Glow central */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 600px; height: 300px;
+      background: radial-gradient(ellipse at center, rgba(0,212,255,0.07) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .wrapper { position: relative; z-index: 1; width: 100%; max-width: 900px; }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 36px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      border: 1.5px solid var(--cyan);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--cyan);
+      font-size: 18px;
+    }
+    .logo h1 {
+      font-size: 22px; font-weight: 700; letter-spacing: 0.08em;
+      color: #fff;
+    }
+    .logo h1 span { color: var(--cyan); }
+
+    .status-badge {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      transition: all 0.3s;
+    }
+    .status-badge.online { border-color: var(--green-dim); color: var(--green); }
+    .status-badge.online .dot { background: var(--green); }
+    .status-badge.offline { border-color: #3d1515; color: var(--red); }
+    .status-badge.offline .dot { background: var(--red); }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--muted);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* ── Cards de métricas ── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 580px) { .metrics-grid { grid-template-columns: 1fr; } }
+
+    .metric-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 32px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s;
+    }
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      border-radius: 16px 16px 0 0;
+    }
+    .metric-card.speed::before  { background: linear-gradient(90deg, transparent, var(--cyan), transparent); }
+    .metric-card.rpm::before    { background: linear-gradient(90deg, transparent, var(--green), transparent); }
+
+    .metric-card.active.speed  { border-color: var(--cyan-dim); }
+    .metric-card.active.rpm    { border-color: var(--green-dim); }
+
+    .metric-label {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .metric-card.speed .metric-label { color: var(--cyan); }
+    .metric-card.rpm   .metric-label { color: var(--green); }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: 72px;
+      line-height: 1;
+      color: #fff;
+      transition: color 0.3s;
+      letter-spacing: -2px;
+    }
+    .metric-card.speed .metric-value { text-shadow: 0 0 30px rgba(0,212,255,0.35); }
+    .metric-card.rpm   .metric-value { text-shadow: 0 0 30px rgba(0,255,136,0.3); }
+
+    .metric-unit {
+      font-size: 18px; font-weight: 600;
+      margin-top: 8px;
+      letter-spacing: 0.05em;
+    }
+    .metric-card.speed .metric-unit { color: var(--cyan); }
+    .metric-card.rpm   .metric-unit { color: var(--green); }
+
+    /* Barra de nível */
+    .metric-bar-track {
+      margin-top: 20px;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .metric-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+    }
+    .metric-card.speed .metric-bar-fill { background: linear-gradient(90deg, var(--cyan-dim), var(--cyan)); }
+    .metric-card.rpm   .metric-bar-fill { background: linear-gradient(90deg, var(--green-dim), var(--green)); }
+
+    /* ── Gauge SVG ── */
+    .gauge-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .gauge-title {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.15em;
+      text-transform: uppercase; color: var(--muted);
+      margin-bottom: 24px; align-self: flex-start;
+    }
+    .gauge-wrap { position: relative; width: 260px; height: 150px; }
+    #gauge-svg { width: 260px; height: 150px; }
+    .gauge-center-label {
+      position: absolute;
+      bottom: 0; left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      font-family: var(--font-mono);
+    }
+    .gauge-center-label .val { font-size: 36px; color: #fff; letter-spacing: -1px; }
+    .gauge-center-label .unit { font-size: 13px; color: var(--cyan); letter-spacing: 0.1em; }
+
+    /* ── Log / Feed ── */
+    .log-section {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .log-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .log-title {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.15em;
+      text-transform: uppercase; color: var(--muted);
+    }
+    .log-count {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--muted); background: var(--bg2);
+      padding: 2px 8px; border-radius: 10px;
+    }
+    #log-list {
+      list-style: none;
+      display: flex; flex-direction: column; gap: 4px;
+      max-height: 180px; overflow-y: auto;
+    }
+    #log-list::-webkit-scrollbar { width: 4px; }
+    #log-list::-webkit-scrollbar-track { background: transparent; }
+    #log-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .log-entry {
+      display: flex; gap: 12px; align-items: center;
+      font-family: var(--font-mono); font-size: 12px;
+      padding: 6px 10px; border-radius: 6px;
+      background: var(--bg2);
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity:0; transform: translateY(-4px); } to { opacity:1; transform: none; } }
+    .log-time { color: var(--muted); min-width: 80px; }
+    .log-vel  { color: var(--cyan); }
+    .log-rpm  { color: var(--green); }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 32px;
+      font-size: 12px; color: var(--muted);
+      text-align: center; letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <h1>VELOCI<span>METRO</span> IoT</h1>
+    </div>
+    <div class="status-badge" id="status-badge">
+      <span class="dot"></span>
+      <span id="status-text">Conectando...</span>
+    </div>
+  </header>
+
+  <!-- Cards principais -->
+  <div class="metrics-grid">
+    <div class="metric-card speed" id="card-speed">
+      <div class="metric-label">Velocidade</div>
+      <div class="metric-value" id="val-speed">0.00</div>
+      <div class="metric-unit">km/h</div>
+      <div class="metric-bar-track">
+        <div class="metric-bar-fill" id="bar-speed"></div>
+      </div>
+    </div>
+    <div class="metric-card rpm" id="card-rpm">
+      <div class="metric-label">Rotação</div>
+      <div class="metric-value" id="val-rpm">0.00</div>
+      <div class="metric-unit">RPM</div>
+      <div class="metric-bar-track">
+        <div class="metric-bar-fill" id="bar-rpm"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gauge -->
+  <div class="gauge-section">
+    <div class="gauge-title">Velocímetro</div>
+    <div class="gauge-wrap">
+      <svg id="gauge-svg" viewBox="0 0 260 150">
+        <!-- Trilha -->
+        <path id="gauge-track"
+          d="M 20 140 A 110 110 0 0 1 240 140"
+          fill="none" stroke="#1e2530" stroke-width="14" stroke-linecap="round"/>
+        <!-- Preenchimento -->
+        <path id="gauge-fill"
+          d="M 20 140 A 110 110 0 0 1 240 140"
+          fill="none" stroke="url(#gaugeGrad)" stroke-width="14" stroke-linecap="round"
+          stroke-dasharray="0 346" style="transition: stroke-dasharray 0.8s cubic-bezier(0.25,1,0.5,1)"/>
+        <!-- Marcas -->
+        <g stroke="#2a3545" stroke-width="1.5">
+          <line x1="20"  y1="140" x2="30"  y2="140" transform="rotate(-180, 130, 140)"/>
+          <line x1="20"  y1="140" x2="28"  y2="140" transform="rotate(-162, 130, 140)"/>
+          <line x1="20"  y1="140" x2="28"  y2="140" transform="rotate(-144, 130, 140)"/>
+          <line x1="20"  y1="140" x2="30"  y2="140" transform="rotate(-126, 130, 140)"/>
+          <line x1="20"  y1="140" x2="28"  y2="140" transform="rotate(-108, 130, 140)"/>
+          <line x1="20"  y1="140" x2="28"  y2="140" transform="rotate(-90,  130, 140)"/>
+          <line x1="20"  y1="140" x2="30"  y2="140" transform="rotate(-72,  130, 140)"/>
+          <line x1="20"  y1="140" x2="28"  y2="140" transform="rotate(-54,  130, 140)"/>
+          <line x1="20"  y1="140" x2="28"  y2="140" transform="rotate(-36,  130, 140)"/>
+          <line x1="20"  y1="140" x2="30"  y2="140" transform="rotate(-18,  130, 140)"/>
+          <line x1="20"  y1="140" x2="30"  y2="140" transform="rotate(0,    130, 140)"/>
+        </g>
+        <!-- Labels do gauge -->
+        <text x="14"  y="132" fill="#4a5568" font-size="9" font-family="Share Tech Mono,monospace">0</text>
+        <text x="116" y="28"  fill="#4a5568" font-size="9" font-family="Share Tech Mono,monospace" text-anchor="middle">60</text>
+        <text x="234" y="132" fill="#4a5568" font-size="9" font-family="Share Tech Mono,monospace" text-anchor="end">120</text>
+        <defs>
+          <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%"   stop-color="#00d4ff"/>
+            <stop offset="60%"  stop-color="#00ff88"/>
+            <stop offset="100%" stop-color="#ffb300"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <div class="gauge-center-label">
+        <div class="val" id="gauge-val">0.0</div>
+        <div class="unit">km/h</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log de registros -->
+  <div class="log-section">
+    <div class="log-header">
+      <div class="log-title">Histórico de leituras</div>
+      <div class="log-count" id="log-count">0 registros</div>
+    </div>
+    <ul id="log-list"></ul>
+  </div>
+
+  <footer>ESP32 · Sensor Hall · HTTP POST · MySQL · PHP · JS Fetch API</footer>
+</div>
+
+<script>
+  const MAX_SPEED = 120;   // km/h máximo para a barra e gauge
+  const MAX_RPM   = 5000;  // RPM máximo para a barra
+  const ARC_LEN   = 346;   // comprimento do arco SVG do gauge
+  let logCount    = 0;
+  let erroConsecutivo = 0;
+
+  // ── Atualiza o gauge SVG ──────────────────────────────────
+  function atualizarGauge(velocidade) {
+    const pct = Math.min(velocidade / MAX_SPEED, 1);
+    const dash = pct * ARC_LEN;
+    document.getElementById('gauge-fill').setAttribute(
+      'stroke-dasharray', `${dash} ${ARC_LEN - dash}`
+    );
+    document.getElementById('gauge-val').textContent =
+      velocidade.toFixed(1);
+  }
+
+  // ── Atualiza os cards de métricas ─────────────────────────
+  function atualizarCards(vel, rpm) {
+    document.getElementById('val-speed').textContent = vel.toFixed(2);
+    document.getElementById('val-rpm').textContent   = rpm.toFixed(2);
+
+    const pctVel = Math.min(vel / MAX_SPEED * 100, 100);
+    const pctRpm = Math.min(rpm / MAX_RPM * 100, 100);
+    document.getElementById('bar-speed').style.width = pctVel + '%';
+    document.getElementById('bar-rpm').style.width   = pctRpm + '%';
+
+    const cardSpeed = document.getElementById('card-speed');
+    const cardRpm   = document.getElementById('card-rpm');
+    cardSpeed.classList.toggle('active', vel > 0);
+    cardRpm.classList.toggle('active',   rpm > 0);
+  }
+
+  // ── Adiciona linha no log ─────────────────────────────────
+  function adicionarLog(vel, rpm, ts) {
+    logCount++;
+    document.getElementById('log-count').textContent = logCount + ' registro' + (logCount !== 1 ? 's' : '');
+
+    const hora = ts ? new Date(ts).toLocaleTimeString('pt-BR') : new Date().toLocaleTimeString('pt-BR');
+    const li = document.createElement('li');
+    li.className = 'log-entry';
+    li.innerHTML = `
+      <span class="log-time">${hora}</span>
+      <span class="log-vel">vel: ${vel.toFixed(2)} km/h</span>
+      <span class="log-rpm">rpm: ${rpm.toFixed(2)}</span>
+    `;
+
+    const lista = document.getElementById('log-list');
+    lista.insertBefore(li, lista.firstChild);
+
+    // Mantém no máximo 50 entradas visíveis
+    if (lista.children.length > 50) lista.removeChild(lista.lastChild);
+  }
+
+  // ── Status badge ──────────────────────────────────────────
+  function setStatus(online) {
+    const badge = document.getElementById('status-badge');
+    const texto = document.getElementById('status-text');
+    badge.className = 'status-badge ' + (online ? 'online' : 'offline');
+    texto.textContent = online ? 'Online' : 'Sem dados';
+  }
+
+  // ── Busca os dados da API PHP ─────────────────────────────
+  async function atualizarDados() {
+    try {
+      const response = await fetch('buscar_ultimo.php');
+
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+
+      const data = await response.json();
+
+      const vel = parseFloat(data.velocidade) || 0;
+      const rpm = parseFloat(data.rpm)        || 0;
+
+      atualizarCards(vel, rpm);
+      atualizarGauge(vel);
+      adicionarLog(vel, rpm, data.registrado_em);
+
+      setStatus(true);
+      erroConsecutivo = 0;
+
+    } catch (err) {
+      erroConsecutivo++;
+      if (erroConsecutivo >= 3) setStatus(false);
+      console.error('[Fetch] Erro ao buscar dados:', err.message);
+    }
+  }
+
+  // ── Inicializa e agenda atualizações ──────────────────────
+  atualizarDados();
+  setInterval(atualizarDados, 1000); // Atualiza a cada 1 segundo
+</script>
+</body>
+</html>
