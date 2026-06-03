@@ -277,8 +277,6 @@
       <span id="status-text">Conectando...</span>
     </div>
   </header>
-
-  <!-- Cards principais -->
   <div class="metrics-grid">
     <div class="metric-card speed" id="card-speed">
       <div class="metric-label">Velocidade</div>
@@ -297,22 +295,17 @@
       </div>
     </div>
   </div>
-
-  <!-- Gauge -->
   <div class="gauge-section">
     <div class="gauge-title">Velocímetro</div>
     <div class="gauge-wrap">
       <svg id="gauge-svg" viewBox="0 0 260 150">
-        <!-- Trilha -->
         <path id="gauge-track"
           d="M 20 140 A 110 110 0 0 1 240 140"
           fill="none" stroke="#1e2530" stroke-width="14" stroke-linecap="round"/>
-        <!-- Preenchimento -->
         <path id="gauge-fill"
           d="M 20 140 A 110 110 0 0 1 240 140"
           fill="none" stroke="url(#gaugeGrad)" stroke-width="14" stroke-linecap="round"
           stroke-dasharray="0 346" style="transition: stroke-dasharray 0.8s cubic-bezier(0.25,1,0.5,1)"/>
-        <!-- Marcas -->
         <g stroke="#2a3545" stroke-width="1.5">
           <line x1="20"  y1="140" x2="30"  y2="140" transform="rotate(-180, 130, 140)"/>
           <line x1="20"  y1="140" x2="28"  y2="140" transform="rotate(-162, 130, 140)"/>
@@ -326,7 +319,6 @@
           <line x1="20"  y1="140" x2="30"  y2="140" transform="rotate(-18,  130, 140)"/>
           <line x1="20"  y1="140" x2="30"  y2="140" transform="rotate(0,    130, 140)"/>
         </g>
-        <!-- Labels do gauge -->
         <text x="14"  y="132" fill="#4a5568" font-size="9" font-family="Share Tech Mono,monospace">0</text>
         <text x="116" y="28"  fill="#4a5568" font-size="9" font-family="Share Tech Mono,monospace" text-anchor="middle">60</text>
         <text x="234" y="132" fill="#4a5568" font-size="9" font-family="Share Tech Mono,monospace" text-anchor="end">120</text>
@@ -344,8 +336,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Log de registros -->
   <div class="log-section">
     <div class="log-header">
       <div class="log-title">Histórico de leituras</div>
@@ -353,18 +343,14 @@
     </div>
     <ul id="log-list"></ul>
   </div>
-
-  <footer>ESP32 · Sensor Hall · HTTP POST · MySQL · PHP · JS Fetch API</footer>
 </div>
 
 <script>
-  const MAX_SPEED = 120;   // km/h máximo para a barra e gauge
-  const MAX_RPM   = 5000;  // RPM máximo para a barra
-  const ARC_LEN   = 346;   // comprimento do arco SVG do gauge
+  const MAX_SPEED = 120;
+  const MAX_RPM   = 5000;
+  const ARC_LEN   = 346;
   let logCount    = 0;
   let erroConsecutivo = 0;
-
-  // ── Atualiza o gauge SVG ──────────────────────────────────
   function atualizarGauge(velocidade) {
     const pct = Math.min(velocidade / MAX_SPEED, 1);
     const dash = pct * ARC_LEN;
@@ -374,8 +360,6 @@
     document.getElementById('gauge-val').textContent =
       velocidade.toFixed(1);
   }
-
-  // ── Atualiza os cards de métricas ─────────────────────────
   function atualizarCards(vel, rpm) {
     document.getElementById('val-speed').textContent = vel.toFixed(2);
     document.getElementById('val-rpm').textContent   = rpm.toFixed(2);
@@ -390,8 +374,6 @@
     cardSpeed.classList.toggle('active', vel > 0);
     cardRpm.classList.toggle('active',   rpm > 0);
   }
-
-  // ── Adiciona linha no log ─────────────────────────────────
   function adicionarLog(vel, rpm, ts) {
     logCount++;
     document.getElementById('log-count').textContent = logCount + ' registro' + (logCount !== 1 ? 's' : '');
@@ -407,20 +389,14 @@
 
     const lista = document.getElementById('log-list');
     lista.insertBefore(li, lista.firstChild);
-
-    // Mantém no máximo 50 entradas visíveis
     if (lista.children.length > 50) lista.removeChild(lista.lastChild);
   }
-
-  // ── Status badge ──────────────────────────────────────────
   function setStatus(online) {
     const badge = document.getElementById('status-badge');
     const texto = document.getElementById('status-text');
     badge.className = 'status-badge ' + (online ? 'online' : 'offline');
     texto.textContent = online ? 'Online' : 'Sem dados';
   }
-
-  // ── Busca os dados da API PHP ─────────────────────────────
   async function atualizarDados() {
     try {
       const response = await fetch('buscar_ultimo.php');
@@ -445,10 +421,8 @@
       console.error('[Fetch] Erro ao buscar dados:', err.message);
     }
   }
-
-  // ── Inicializa e agenda atualizações ──────────────────────
   atualizarDados();
-  setInterval(atualizarDados, 1000); // Atualiza a cada 1 segundo
+  setInterval(atualizarDados, 1000);
 </script>
 </body>
 </html>
