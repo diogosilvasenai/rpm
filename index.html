@@ -215,47 +215,6 @@
     }
     .gauge-center-label .val { font-size: 36px; color: #fff; letter-spacing: -1px; }
     .gauge-center-label .unit { font-size: 13px; color: var(--cyan); letter-spacing: 0.1em; }
-
-    /* ── Log / Feed ── */
-    .log-section {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
-    }
-    .log-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 16px;
-    }
-    .log-title {
-      font-size: 11px; font-weight: 600; letter-spacing: 0.15em;
-      text-transform: uppercase; color: var(--muted);
-    }
-    .log-count {
-      font-family: var(--font-mono); font-size: 11px;
-      color: var(--muted); background: var(--bg2);
-      padding: 2px 8px; border-radius: 10px;
-    }
-    #log-list {
-      list-style: none;
-      display: flex; flex-direction: column; gap: 4px;
-      max-height: 180px; overflow-y: auto;
-    }
-    #log-list::-webkit-scrollbar { width: 4px; }
-    #log-list::-webkit-scrollbar-track { background: transparent; }
-    #log-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-    .log-entry {
-      display: flex; gap: 12px; align-items: center;
-      font-family: var(--font-mono); font-size: 12px;
-      padding: 6px 10px; border-radius: 6px;
-      background: var(--bg2);
-      animation: fadeIn 0.3s ease;
-    }
-    @keyframes fadeIn { from { opacity:0; transform: translateY(-4px); } to { opacity:1; transform: none; } }
-    .log-time { color: var(--muted); min-width: 80px; }
-    .log-vel  { color: var(--cyan); }
-    .log-rpm  { color: var(--green); }
-
     /* ── Footer ── */
     footer {
       margin-top: 32px;
@@ -271,10 +230,6 @@
     <div class="logo">
       <div class="logo-icon">⚡</div>
       <h1>VELOCI<span>METRO</span> IoT</h1>
-    </div>
-    <div class="status-badge" id="status-badge">
-      <span class="dot"></span>
-      <span id="status-text">Conectando...</span>
     </div>
   </header>
   <div class="metrics-grid">
@@ -335,94 +290,22 @@
         <div class="unit">km/h</div>
       </div>
     </div>
-  </div>
-  <div class="log-section">
-    <div class="log-header">
-      <div class="log-title">Histórico de leituras</div>
-      <div class="log-count" id="log-count">0 registros</div>
     </div>
-    <ul id="log-list"></ul>
   </div>
 </div>
 
 <script>
-  const MAX_SPEED = 120;
-  const MAX_RPM   = 5000;
-  const ARC_LEN   = 346;
-  let logCount    = 0;
-  let erroConsecutivo = 0;
-  function atualizarGauge(velocidade) {
-    const pct = Math.min(velocidade / MAX_SPEED, 1);
-    const dash = pct * ARC_LEN;
-    document.getElementById('gauge-fill').setAttribute(
-      'stroke-dasharray', `${dash} ${ARC_LEN - dash}`
-    );
-    document.getElementById('gauge-val').textContent =
-      velocidade.toFixed(1);
-  }
-  function atualizarCards(vel, rpm) {
-    document.getElementById('val-speed').textContent = vel.toFixed(2);
-    document.getElementById('val-rpm').textContent   = rpm.toFixed(2);
-
-    const pctVel = Math.min(vel / MAX_SPEED * 100, 100);
-    const pctRpm = Math.min(rpm / MAX_RPM * 100, 100);
-    document.getElementById('bar-speed').style.width = pctVel + '%';
-    document.getElementById('bar-rpm').style.width   = pctRpm + '%';
-
-    const cardSpeed = document.getElementById('card-speed');
-    const cardRpm   = document.getElementById('card-rpm');
-    cardSpeed.classList.toggle('active', vel > 0);
-    cardRpm.classList.toggle('active',   rpm > 0);
-  }
-  function adicionarLog(vel, rpm, ts) {
-    logCount++;
-    document.getElementById('log-count').textContent = logCount + ' registro' + (logCount !== 1 ? 's' : '');
-
-    const hora = ts ? new Date(ts).toLocaleTimeString('pt-BR') : new Date().toLocaleTimeString('pt-BR');
-    const li = document.createElement('li');
-    li.className = 'log-entry';
-    li.innerHTML = `
-      <span class="log-time">${hora}</span>
-      <span class="log-vel">vel: ${vel.toFixed(2)} km/h</span>
-      <span class="log-rpm">rpm: ${rpm.toFixed(2)}</span>
-    `;
-
-    const lista = document.getElementById('log-list');
-    lista.insertBefore(li, lista.firstChild);
-    if (lista.children.length > 50) lista.removeChild(lista.lastChild);
-  }
-  function setStatus(online) {
-    const badge = document.getElementById('status-badge');
-    const texto = document.getElementById('status-text');
-    badge.className = 'status-badge ' + (online ? 'online' : 'offline');
-    texto.textContent = online ? 'Online' : 'Sem dados';
-  }
-  async function atualizarDados() {
-    try {
-      const response = await fetch('buscar_ultimo.php');
-
-      if (!response.ok) throw new Error('HTTP ' + response.status);
-
-      const data = await response.json();
-
-      const vel = parseFloat(data.velocidade) || 0;
-      const rpm = parseFloat(data.rpm)        || 0;
-
-      atualizarCards(vel, rpm);
-      atualizarGauge(vel);
-      adicionarLog(vel, rpm, data.registrado_em);
-
-      setStatus(true);
-      erroConsecutivo = 0;
-
-    } catch (err) {
-      erroConsecutivo++;
-      if (erroConsecutivo >= 3) setStatus(false);
-      console.error('[Fetch] Erro ao buscar dados:', err.message);
-    }
-  }
-  atualizarDados();
-  setInterval(atualizarDados, 1000);
+function atualizarDados() {
+fetch('buscar_ultimo.php')
+.then(response => response.json())
+.then(data => {
+document.getElementById('val-speed').innerText = data.velocidade;
+document.getElementById('val-rpm').innerText = data.rpm;
+})
+.catch(error => console.log(error));
+}
+atualizarDados();
+setInterval(atualizarDados, 1000);
 </script>
 </body>
 </html>
