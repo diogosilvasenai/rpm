@@ -1,7 +1,7 @@
 <?php
 include 'connect.php';
 
-$query = $conn->query("SELECT rpm, kph FROM monitoramento ORDER BY id DESC LIMIT 1");
+$query = $conn->query("SELECT rpm, kph FROM dados_velocidade ORDER BY id DESC LIMIT 1");
 
 if ($query && $query->num_rows > 0) {
     $row = $query->fetch_assoc();
