@@ -5,7 +5,7 @@ $query = $conn->query("SELECT rpm, kph FROM dados_velocidade ORDER BY id DESC LI
 
 if ($query && $query->num_rows > 0) {
     $row = $query->fetch_assoc();
-    echo json_encode(['rpm' => $row['rpm'], 'kph' => $row['kph']]);
+    echo json_encode(['rpm' => $row['rpm'], 'velocidade' => $row['kph']]);
 } else {
     echo json_encode(['rpm' => 0, 'kph' => 0]);
 }
