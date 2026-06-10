@@ -4,6 +4,7 @@ create database velocimetro_iot;
 use velocimetro_iot;
 -- criar a tabela
 create table dados_velocidade (
+    id int auto_increment primary key,
     kph float,
-    rpm int
+    rpm float
 );
